@@ -11,6 +11,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
 
+// Dummy login credentials
 const USERS = {
   "101": "math123",
   "102": "science456",
@@ -28,19 +29,20 @@ app.post('/api/login', (req, res) => {
   }
 });
 
-// SCHEDULE
+// VIEW SCHEDULE
 app.get('/api/schedule', (req, res) => {
   const { teacher_id } = req.query;
   const filePath = path.join(__dirname, 'schedule.xlsx');
 
-  if (!fs.existsSync(filePath))
+  if (!fs.existsSync(filePath)) {
     return res.status(500).json({ error: "Schedule file missing." });
+  }
 
   const wb = xlsx.readFile(filePath);
   const data = xlsx.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
   const result = data.filter(row => String(row.teacher_id).trim() === teacher_id);
 
-  result.length
+  return result.length
     ? res.json(result)
     : res.status(404).json({ error: "No schedule found." });
 });
@@ -80,7 +82,7 @@ app.get('/api/my-requests', (req, res) => {
   res.json(filtered);
 });
 
-// ACCEPT OR DECLINE REQUEST
+// ACCEPT / DECLINE REQUESTS
 app.post('/api/respond', (req, res) => {
   const { teacher_id, index, status } = req.body;
   const filePath = path.join(__dirname, 'substitutions.xlsx');
@@ -99,8 +101,10 @@ app.post('/api/respond', (req, res) => {
 
   const target = myRequests[index];
   const targetIndex = data.findIndex(r =>
-    r.from === target.from && r.to === target.to &&
-    r.date === target.date && r.reason === target.reason
+    r.from === target.from &&
+    r.to === target.to &&
+    r.date === target.date &&
+    r.reason === target.reason
   );
 
   if (targetIndex !== -1) {
@@ -116,6 +120,8 @@ app.post('/api/respond', (req, res) => {
 
   res.status(500).json({ error: "Could not update request." });
 });
+
+// VIEW SENT REQUESTS
 app.get('/api/sent-requests', (req, res) => {
   const { teacher_id } = req.query;
   const filePath = path.join(__dirname, 'substitutions.xlsx');
@@ -129,7 +135,7 @@ app.get('/api/sent-requests', (req, res) => {
   res.json(result);
 });
 
-
+// SERVE DASHBOARD FRONTEND
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
