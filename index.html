@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Teacher Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body onload="initDashboard()">
+  <div class="container">
+    <nav class="sidebar">
+      <h2 class="logo">📘 Portal</h2>
+      <ul>
+        <li onclick="switchSection('homeSection')">🏠 Dashboard</li>
+        <li onclick="switchSection('scheduleSection')">📅 View Schedule</li>
+        <li onclick="switchSection('submitSection')">📝 Submit Request</li>
+        <li onclick="switchSection('requestSection')">
+          📥 View Requests <span id="requestCount" class="badge"></span>
+        </li>
+        <li onclick="switchSection('mySubmissionsSection')">📤 My Requests</li>
+        <li onclick="logout()">🚪 Logout</li>
+      </ul>
+    </nav>
+
+    <main class="content">
+      <h2>Welcome, Teacher <span id="teacherId"></span></h2>
+
+      <section id="homeSection">
+        <p>Select an option from the menu to get started.</p>
+      </section>
+
+      <section id="scheduleSection" class="hidden">
+        <h3>Your Schedule</h3>
+        <div id="output"></div>
+      </section>
+
+      <section id="submitSection" class="hidden">
+        <h3>Request a Substitution</h3>
+        <select id="substituteTeacher">
+          <option value="">-- Select --</option>
+          <option value="101">Teacher 101</option>
+          <option value="102">Teacher 102</option>
+          <option value="103">Teacher 103</option>
+          <option value="104">Teacher 104</option>
+        </select>
+        <input type="text" id="date" placeholder="Date (e.g. 2025-07-01)" />
+        <input type="text" id="reason" placeholder="Reason" />
+        <button onclick="submitSubstitution()">Submit</button>
+        <div id="subResult"></div>
+      </section>
+
+      <section id="requestSection" class="hidden">
+        <h3>Incoming Requests</h3>
+        <div id="incomingRequests"></div>
+      </section>
+
+      <section id="mySubmissionsSection" class="hidden">
+        <h3>My Substitution Requests</h3>
+        <div id="myRequests"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    function initDashboard() {
+      const id = localStorage.getItem("teacherId");
+      if (!id) return window.location.href = "login.html";
+      document.getElementById("teacherId").textContent = id;
+      switchSection("homeSection");
+      loadSchedule();
+      loadRequests();
+    }
+
+    function switchSection(activeId) {
+      const sections = ["homeSection", "scheduleSection", "submitSection", "requestSection", "mySubmissionsSection"];
+      sections.forEach(id => document.getElementById(id)?.classList.add("hidden"));
+      document.getElementById(activeId)?.classList.remove("hidden");
+
+      if (activeId === "mySubmissionsSection") loadMySubmissions();
+    }
+
+    function logout() {
+      localStorage.removeItem("teacherId");
+      window.location.href = "login.html";
+    }
+
+    function loadSchedule() {
+      const id = localStorage.getItem("teacherId");
+      fetch(`http://localhost:3000/api/schedule?teacher_id=${id}`)
+        .then(res => res.json())
+        .then(data => {
+          const out = document.getElementById("output");
+          if (!data || !data.length) return out.innerHTML = "<p>No schedule found.</p>";
+          let html = "<table><tr><th>Day</th><th>Subject</th><th>Time</th></tr>";
+          data.forEach(r => {
+            html += `<tr><td>${r.day}</td><td>${r.subject}</td><td>${r.time}</td></tr>`;
+          });
+          html += "</table>";
+          out.innerHTML = html;
+        });
+    }
+
+    function submitSubstitution() {
+      const from = localStorage.getItem("teacherId");
+      const to = document.getElementById("substituteTeacher").value;
+      const date = document.getElementById("date").value.trim();
+      const reason = document.getElementById("reason").value.trim();
+
+      if (!to) return document.getElementById("subResult").innerText = "Select a substitute teacher.";
+
+      fetch("http://localhost:3000/api/substitute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from, to, date, reason })
+      })
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("subResult").innerText = data.message;
+        loadRequests();
+      });
+    }
+
+    function loadRequests() {
+      const id = localStorage.getItem("teacherId");
+      fetch(`http://localhost:3000/api/my-requests?teacher_id=${id}`)
+        .then(res => res.json())
+        .then(data => {
+          const container = document.getElementById("incomingRequests");
+          const badge = document.getElementById("requestCount");
+
+          if (!data || !data.length) {
+            container.innerHTML = "<p>No requests received.</p>";
+            if (badge) badge.textContent = "";
+            return;
+          }
+
+          let html = "<ul>";
+          let pendingCount = 0;
+
+          data.forEach((r, index) => {
+            const isPending = !r.status || r.status === "pending";
+            if (isPending) pendingCount++;
+
+            html += `<li>
+              📩 From: ${r.from} on ${r.date} — ${r.reason}
+              ${isPending ? `
+                <button onclick="respondToRequest(${index}, 'accepted')">✅ Accept</button>
+                <button onclick="respondToRequest(${index}, 'declined')">❌ Decline</button>
+              ` : `<strong>— ${r.status.toUpperCase()}</strong>`}
+            </li>`;
+          });
+
+          html += "</ul>";
+          container.innerHTML = html;
+          if (badge) badge.textContent = pendingCount || "";
+        });
+    }
+
+    function respondToRequest(index, status) {
+      const teacherId = localStorage.getItem("teacherId");
+      fetch("http://localhost:3000/api/respond", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teacher_id: teacherId, index, status })
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert(data.message);
+        loadRequests();
+      });
+    }
+
+    function loadMySubmissions() {
+      const id = localStorage.getItem("teacherId");
+      fetch(`http://localhost:3000/api/sent-requests?teacher_id=${id}`)
+        .then(res => res.json())
+        .then(data => {
+          const container = document.getElementById("myRequests");
+          if (!data || !data.length) return container.innerHTML = "<p>You haven't made any requests yet.</p>";
+
+          let html = "<ul>";
+          data.forEach(r => {
+            html += `<li>📝 To: ${r.to} on ${r.date} — ${r.reason} — <strong>${(r.status || "pending").toUpperCase()}</strong></li>`;
+          });
+          html += "</ul>";
+          container.innerHTML = html;
+        });
+    }
+  </script>
+</body>
+</html>

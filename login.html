@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Teacher Login</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h2>Teacher Login</h2>
+
+  <input type="text" id="teacherId" placeholder="Enter Teacher ID" />
+  <input type="password" id="password" placeholder="Enter Password" />
+  <button onclick="login()">Login</button>
+
+  <div id="result"></div>
+
+  <script>
+    function login() {
+      const teacherId = document.getElementById('teacherId').value.trim();
+      const password = document.getElementById('password').value.trim();
+
+      fetch('http://localhost:3000/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teacher_id: teacherId, password: password })
+      })
+      .then(res => res.json())
+      .then(data => {
+        const result = document.getElementById('result');
+        if (data.success) {
+          localStorage.setItem('teacherId', teacherId);
+          window.location.href = 'index.html';
+        } else {
+          result.innerHTML = `<p>❌ ${data.error}</p>`;
+        }
+      })
+      .catch(error => {
+        document.getElementById('result').innerHTML = `<p>🚫 Server error.</p>`;
+      });
+    }
+  </script>
+</body>
+</html>
