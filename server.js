@@ -128,7 +128,7 @@ app.get('/api/sent-requests', (req, res) => {
 
   res.json(result);
 });
-const path = require("path");
+
 
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
